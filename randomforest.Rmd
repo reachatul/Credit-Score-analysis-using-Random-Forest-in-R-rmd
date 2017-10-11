@@ -1,0 +1,210 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+the following is a step by step procedure for predicting credit score in using Random Forest Algorithm in R. We first talk about the random forest algorithm and how it works. 
+We then start with analyzing the data and tune it to better suit our solution.
+
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+Using Random Forest For Credit Scoring:
+"Improve on the state of the art in credit scoring by predicting the probability that somebody will experience financial distress in the next two years. "
+
+We first set the working directory and upload the test and train files into the local R database.
+
+Random forest is a type of decision tree algorithm. A decision tree algorithm is a supervised learning algorithm which has a predefined target variable that is mostly used in classification problems. It works for both categorical and continuous input and output variables and thus is the panacea of the data science problem. R has a package called RandomForest which makes life pretty easy to solve such a problem but as it is with Data Science Problems, the true zest lies in tuning and woking with the data to come to a point where randomForest can efficiently solve it. Here in this problem the code is quite readable but having said that, I have done my best to go step byu step to explain each procedure.
+
+
+ 
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+```{r}
+setwd("C:/Users/Atul/Desktop/risk analysis")
+train1 <- read.csv("cs-training.csv")
+test1 <- read.csv("cs-test.csv")
+head(test1)
+head(train1)
+```
+
+
+We find explore both the databases and try to understand the underlying problem. We check data structures of each of the data features and check which of the following features are NA's.
+
+```{r}
+combi <- rbind(train1,test1)
+str(combi)
+summary(combi)
+```
+ What we did is we combined both test and train datasets, and got the strusture and summary of the combi datatset to get some good insights about the data. The features are self explanatory and can tell a good thing or two about the data itself. 
+ 
+ 
+```{r}
+library(rpart)
+combi$AgeClass <- '64+'
+combi$AgeClass[combi$age > 0 & combi$age <= 40] <- '0-40'
+combi$AgeClass[combi$age > 40 & combi$age <=52] <- '41-52'
+combi$AgeClass[combi$age > 52 & combi$age <=64] <- '43-54'
+combi$AgeClass <- as.factor(combi$AgeClass)
+#combi$AgeClass[is.na(combi$age)] <- NA
+```
+
+we now divide age into different cattegories to make our classification tree more efficient. Here, one can see that we havw now divided the feature age in 4 classes. 
+
+```{r}
+library(gmodels)
+CrossTable(combi$SeriousDlqin2yrs)
+```
+
+
+The following table gives a good insight about the number of 0s and 1s in the datasets. We know that around 93.3% have had serious deliquencies in two years. 
+
+
+```{r}
+DependentsFit <- rpart(NumberOfDependents ~ RevolvingUtilizationOfUnsecuredLines + age + NumberOfOpenCreditLinesAndLoans 
+                       + MonthlyIncome + NumberRealEstateLoansOrLines + DebtRatio,
+                       data=combi[!is.na(combi$NumberOfDependents),], 
+                       method="anova")
+
+combi$NumberOfDependents[is.na(combi$NumberOfDependents)] <- predict(DependentsFit, combi[is.na(combi$NumberOfDependents),])
+sum(is.na(combi$NumberOfDependents))
+
+```
+
+In the above chunk of code we have successfully replaced all the Na's with predicted values acquired from the anova method. It we could also exclude the rows with Na's but this seems like a better choice as we have a lot of data to learn from and edting a little would do no harm.
+
+
+Further, Lets now look at another predictor variable, lets look at the number of times people were lateb by 30-59 dats, lets change the datatype of the variable from integer to factor and change the levels.
+
+```{r}
+combi$NumberOfTime30.59DaysPastDueNotWorse <- as.factor(combi$NumberOfTime30.59DaysPastDueNotWorse)
+
+
+```
+Lets apply the same the numberoftimepast 60-89 days column. And for deliquencies more than 90 days. 
+
+```{r}
+combi$NumberOfTime60.89DaysPastDueNotWorse <- as.factor(combi$NumberOfTime60.89DaysPastDueNotWorse)
+combi$NumberOfTimes90DaysLate <- as.factor(combi$NumberOfTimes90DaysLate)
+```
+
+Let's now fill Na's in the monthy income column by regression using anova technique.
+
+```{r}
+IncomeFit <- rpart(MonthlyIncome ~ RevolvingUtilizationOfUnsecuredLines + age + NumberOfOpenCreditLinesAndLoans + NumberOfDependents + NumberRealEstateLoansOrLines + DebtRatio,
+                   data=combi[!is.na(combi$MonthlyIncome),], 
+                   method="anova")
+
+combi$MonthlyIncome[is.na(combi$MonthlyIncome)] <- predict(IncomeFit, combi[is.na(combi$MonthlyIncome),])
+sum(is.na(combi$MonthlyIncome))#Check the number of Na's to make sure the code has been executed properly.
+```
+Let's now go ahead to the salary variable and create differnet classes for the salary variable data.
+```{r}
+combi$IncomeClass[combi$MonthlyIncome >= 0 & combi$MonthlyIncome <= 1000] <- '0-1000'
+combi$IncomeClass[combi$MonthlyIncome > 1000 & combi$MonthlyIncome <= 2000] <- '1001-2000'
+combi$IncomeClass[combi$MonthlyIncome > 2000 & combi$MonthlyIncome <= 3000] <- '2001-3000'
+combi$IncomeClass[combi$MonthlyIncome > 3000 & combi$MonthlyIncome <= 4000] <- '3001-4000'
+combi$IncomeClass[combi$MonthlyIncome > 4000 & combi$MonthlyIncome <= 6000] <- '4001-6000'
+combi$IncomeClass[combi$MonthlyIncome > 6001 & combi$MonthlyIncome <= 8000] <- '6001-8000'
+combi$IncomeClass[combi$MonthlyIncome > 6000 & combi$MonthlyIncome <= 10000] <- '8001-10000'
+combi$IncomeClass[combi$MonthlyIncome > 10000 & combi$MonthlyIncome <= 20000] <- '10001-20000'
+combi$IncomeClass[combi$MonthlyIncome > 20000] <- '20000+'
+combi$IncomeClass <- as.factor(combi$IncomeClass)
+
+```
+
+One of the most insightful variable in my opinion is the debt ratrio, this has to make a lo0t of sense once we model the Cross Table of Debt Ratio.
+
+```{r}
+combi$DebtRatioClass <- '100+'
+combi$DebtRatioClass[combi$DebtRatio >= 0 & combi$DebtRatio <= 0.5] <- '0-0.5'
+combi$DebtRatioClass[combi$DebtRatio > 0.5 & combi$DebtRatio <= 1] <- '0.5-1'
+combi$DebtRatioClass[combi$DebtRatio > 1 & combi$DebtRatio <= 2] <- '1-2'
+combi$DebtRatioClass[combi$DebtRatio > 2 & combi$DebtRatio <= 10] <- '2-10'
+combi$DebtRatioClass[combi$DebtRatio > 10 & combi$DebtRatio <= 100] <- '10-100'
+combi$DebtRatioClass <- as.factor(combi$DebtRatioClass)
+summary(combi$DebtRatioClass)
+CrossTable(combi$DebtRatioClass)
+CrossTable(combi$SeriousDlqin2yrs,combi$DebtRatioClass, prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+```
+
+As can be seen using the comparison, this makes perfect sense..
+
+The next feature of the dataset to be considered, is the RevolvingUtilizationOfUnsecuredLine, this should be on the same lines of that of debt ratio.
+
+```{r}
+summary(combi$NumberOfOpenCreditLinesAndLoans)
+plot(density(combi$NumberOfOpenCreditLinesAndLoans))
+#Let us model categorically for this variable
+combi$OpenCreditClass <- '20+'
+combi$OpenCreditClass[combi$NumberOfOpenCreditLinesAndLoans >= 0 & combi$NumberOfOpenCreditLinesAndLoans<=5] <- '0-5'
+combi$OpenCreditClass[combi$NumberOfOpenCreditLinesAndLoans > 5 & combi$NumberOfOpenCreditLinesAndLoans<=10] <- '5-10'
+combi$OpenCreditClass[combi$NumberOfOpenCreditLinesAndLoans > 10 & combi$NumberOfOpenCreditLinesAndLoans<=15] <- '10-15'
+combi$OpenCreditClass[combi$NumberOfOpenCreditLinesAndLoans > 15 & combi$NumberOfOpenCreditLinesAndLoans<= 20] <- '15-20'
+combi$OpenCreditClass <- as.factor(combi$OpenCreditClass)
+CrossTable(combi$OpenCreditClass)
+CrossTable(combi$SeriousDlqin2yrs,combi$OpenCreditClass, prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+#independently, this variable does not seem as insightful as other, but i am certain collectively it will be very important.
+
+```
+```{r}
+summary(combi$NumberRealEstateLoansOrLines)
+combi$RealtyLinesClass <- '3+' 
+combi$RealtyLinesClass[combi$NumberRealEstateLoansOrLines >=0 & combi$NumberRealEstateLoansOrLines <= 1] <- '0-1'
+combi$RealtyLinesClass[combi$NumberRealEstateLoansOrLines >1 & combi$NumberRealEstateLoansOrLines <= 2] <- '1-2'
+combi$RealtyLinesClass[combi$NumberRealEstateLoansOrLines >2 & combi$NumberRealEstateLoansOrLines <= 3] <- '2-3'
+combi$RealtyLinesClass <- as.factor(combi$RealtyLinesClass)
+CrossTable(combi$RealtyLinesClass)
+CrossTable(combi$SeriousDlqin2yrs,combi$RealtyLinesClass, prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+str(combi)
+```
+
+After turing all the parameters that we think are important, we now go ahead to solve the predictive model and using Random Forest Algorithm. 
+
+```{r}
+library(randomForest)
+set.seed(888)
+nrow(combi)
+train <- combi[1:150000,]
+test <- combi[150001:251503,]
+```
+To do this we have again divided the combi dataset into train and test datasets.
+
+```{r}
+
+fit <- randomForest(as.factor(SeriousDlqin2yrs) ~ NumberOfTimes90DaysLate + NumberOfTime60.89DaysPastDueNotWorse
+                    + NumberOfTime30.59DaysPastDueNotWorse + NumberOfDependents + AgeClass + DebtRatioClass +
+                      RevolvingUtilizationOfUnsecuredLines+ OpenCreditClass + RealtyLinesClass,
+                    data=train, 
+                    importance=TRUE, 
+                    ntree=25, keep.forest = TRUE)
+
+sum(is.na(train$SeriousDlqin2yrs))
+
+Prediction <- predict(fit, test, type = "prob")
+submit <- data.frame(Id = test$X, Probability = Prediction)
+entry <- data.frame(Id = submit$Id, Probability = submit$Probability.1)
+write.csv(entry, file = "Entry.csv", row.names = FALSE)
+nrow(test)
+
+```
+Let's plot ctree..
+
+```{r}
+library("partykit")
+x <- ctree(as.factor(SeriousDlqin2yrs) ~ NumberOfTimes90DaysLate + NumberOfTime60.89DaysPastDueNotWorse
+           + NumberOfTime30.59DaysPastDueNotWorse + NumberOfDependents + AgeClass + DebtRatioClass +
+             RevolvingUtilizationOfUnsecuredLines + OpenCreditClass + RealtyLinesClass,
+           data=train)
+  
+plot(x, gp = gpar(fontsize = 5),     # font size changed to 6
+     inner_panel=node_inner,
+     ip_args=list(
+       abbreviate = FALSE, 
+       id = FALSE)
+)
+```
+
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
